@@ -33,13 +33,17 @@ def show_flights(flights,flight_container):
     '''
     df_list = [f.to_row() for f in flights]
     df = pd.concat(df_list)
-    show_row = ['gate','actual_datetime','ac','boundType','airType']
+    show_row = ['gate','actual_datetime','ac','boundType','airType','lat','lon','he']
     df = df[show_row]
     df.rename(columns={'gate':'登机口',
                           'actual_datetime':'实际时间',
                           'ac':'航司',
                           'boundType':'类型',
-                          'airType':'机型'},inplace=True)
+                          'airType':'机型',
+                          'lat':'纬度',
+                          'lon':'经度',
+                          'he':'高度'
+                          },inplace=True)
     flight_container.dataframe(df)
 
 def show_task(tasks,task_container):
@@ -74,7 +78,8 @@ def convert_text(text):
                 'isWeiXiu':'廊桥',
                 'isYiBan':'勤务',
                 'isZhongWen':'中文',
-                'isYingWen':'英文'}
+                'isYingWen':'英文',
+                'default':'默认需求'}
     
     res = ''
     for i in text:
@@ -214,6 +219,7 @@ def layout_init():
         st.session_state.pause = False
         st.session_state.reset = False
         st.session_state.reset_response = True
+        st.session_state.reset_type = 'random' # 可选值为 random 和 KM 算法匹配
     st.sidebar.button('开始/继续', on_click=on_start)
 
     # def on_pause():
@@ -232,10 +238,18 @@ def layout_init():
 
     st.sidebar.button('暂停任务', on_click=on_reset)
 
-    def on_reset_response():
+    def on_reset_response_random():
         # 只有点击才需要重新排列
         st.session_state.reset_response = False
-    st.sidebar.button('重新排列', on_click=on_reset_response)
+        st.session_state.reset_type = 'random'
+    
+    st.sidebar.button('重新排列(模拟人工)', on_click=on_reset_response_random)
+
+    def on_reset_response_KM():
+        # 只有点击才需要重新排列
+        st.session_state.reset_response = False
+        st.session_state.reset_type = 'KM'
+    st.sidebar.button('重新派工(更换匹配算法)', on_click=on_reset_response_KM)
 
     st.markdown('## 控制参数')
     global speed,min_work_time,max_work_time
@@ -296,16 +310,18 @@ def data_init():
     os.mkdir('./dataset/crew/')
     airport = airports()
     # Register the work time
-    df_temp = pd.read_csv('./dataset/work_time.csv')
-    df_temp['min'] = st.session_state.min_work_time
-    df_temp['max'] = st.session_state.max_work_time
-    df_temp.to_csv('./dataset/work_time.csv')
+    # df_temp = pd.read_csv('./dataset/work_time.csv')
+    # df_temp['min'] = st.session_state.min_work_time
+    # df_temp['max'] = st.session_state.max_work_time
+    # df_temp.to_csv('./dataset/work_time.csv')
 
-    flights_path = './dataset/flights_obs.xlsx'
-    aviation_path =  './dataset/new_aviationCompany.xlsx'
+    # flights_path = './dataset/flights_obs.xlsx'
+    flights_path = './dataset/flights_obs_0917_0923.xlsx'
+
+    aviation_path = './dataset/new_aviationCompany.xlsx'
     crew_zizhi_path = './dataset/人员资质证明.xlsx'
     crew_group_path = './dataset/人员组别.xlsx'
-    gate_lounge_path = './dataset/Gate_lounge.xlsx'
+    gate_lounge_path = './dataset/Gate_lounge_xy.xlsx'
     type_minNum_path = './dataset/机型最小人员数.xlsx'
     airport.login(aviation_path,flights_path,crew_zizhi_path,crew_group_path,gate_lounge_path,type_minNum_path)
     return airport
@@ -338,6 +354,7 @@ def total_result_pre(time_container,flight_col,name_col,sub_crew_container,crew_
     # crew_container.write('当前时间：{}'.format(now))
     time_container.write('当前时间：{}'.format(now)) # 展示当前的时间
     # 如果有航班信息，展示航班信息
+
     if  flights: # 上一次航班的信息
         show_flights(flights,flight_col) # 展示过去的航班信息
     
@@ -363,20 +380,23 @@ def step(time_container,flight_col,name_col,sub_crew_container,crew_container,to
     if st.session_state.done:
         st.stop()
     # 同时需要保存排列任务的航班数据
-    data = st.session_state['airport'].step() # 获取数据接口']   
-    print('======   Start the simulation   =======')
-    for key in data:
-        print(key)
-        print(data[key])
-    print('=====================') 
-    st.session_state['done'] = st.session_state['airport'].is_done()
+    # data = st.session_state['airport'].step_sim()  # 获取数据接口']  #  启发式算法
+    # data = st.session_state['airport'].step_KM() # 获取数据接口']  #  KM算法
+    data = st.session_state['airport'].step_ADSB()  # 获取数据接口']  #  ADSB+启发式算法
 
-    st.session_state['data'] = data # 每次要求更新数据
+    if data['flights']:
+        print('======   Start the simulation   =======')
+    st.session_state['done'] = st.session_state['airport'].is_done()
+    st.session_state['data'] = copy.deepcopy(data) # 每次要求更新数据
 
     # 如何判断是否应该记录上次历史派工的数据
-    if 'last_data' not in st.session_state or  data['name_list'] != None:
-        st.session_state['last_data'] = copy.deepcopy(data) # 保留最新的data数据,这个数据是无所谓的
-        st.session_state['last_airports'] = copy.deepcopy(before_air) # 保留最新的airports数据
+    if 'last_data' not in st.session_state or data['name_list'] != None:
+        st.session_state['last_data'] = copy.deepcopy(data) # 保留每次任务之后的数据信息
+        st.session_state['last_airports'] = copy.deepcopy(before_air) # 保留每次排列之前任务的信息
+    print('====== Every step is done ======')
+    print('before time:',st.session_state['last_airports'].now)
+    print('now time:',st.session_state['airport'].now)
+    print('=====================')
     total_result_pre(time_container,flight_col,name_col,sub_crew_container,crew_container,total_workload_col,group_workload_col,result_col,confirm_col)
 
 time_container,flight_col,name_col,sub_crew_container,crew_container,total_workload_col,group_workload_col,crew_container,result_col,confirm_col = layout_init()
@@ -399,14 +419,14 @@ if 'data' in st.session_state:
     if st.session_state['reset']: # 重置阶段
         if st.session_state['reset_response']:
             #  True 表示不需要更新响应，直接使用之前数据展示即可
-            st.session_state['data'] = copy.deepcopy(st.session_state['last_data'])
+            st.session_state['data'] = copy.deepcopy(st.session_state['last_data']) # 之前保存的最后的数据信息
             # st.session_state['airport'] = copy.deepcopy(st.session_state['last_airports'])
         else:
             #  False 需要更新响应，应该回退到之前的数据，进行 cover 的迭代
             name_list = st.session_state['last_data']['name_list']
             # 更新重新的数据
             st.session_state['airport'] = copy.deepcopy(st.session_state['last_airports']) # 之前机场的信息 
-            st.session_state['data'] = st.session_state['airport'].step_cover(name_list) # 最新机场的信息
+            st.session_state['data'] = st.session_state['airport'].step_cover(name_list,st.session_state['reset_type']) # 最新机场的信息
             st.session_state['reset_response'] = True
             st.session_state['last_data'] = copy.deepcopy(st.session_state['data']) # 保留最新的数据
     total_result_pre(time_container,flight_col,name_col,sub_crew_container,crew_container,total_workload_col,group_workload_col,result_col,confirm_col)
