@@ -1,7 +1,30 @@
 # 机场 廊桥人员派工项目
 
+## 快速使用
+
+```
+# 以下操作均在项目文件夹运行
+python airports_sim/main.py # 开发版本 + 是否可以正常运行的版本
+streamlit run airports_sim/main_visual.py # 开发版本 + 原始的可视化页面
+streamlit run airports_sim/main_demo.py # 开发版本+可操控按钮可视化页面
+
+streamlit run airports_sim_zp/main_demo.py # 展示版本+可操控按钮可视化页面
+```
+
+
+
+## 项目背景
+
+Milestone 🌟🌟
+
+2024-10-12 完成 zhoupeng 算法模块的嵌入，综合最近算法、ADSB 时间触发、面向业务需求的可视化代码
+
+
+
+---
+
 本项目主要面向浦东机场项目廊桥派工仿真项目，基于仿真技术配合匹配算法完成勤务人员的匹配工作，主要参考沈老师的《0317 机场派工逻辑》
-![沈老师派工逻辑梳理示意图](https://chenxia31blog.oss-cn-hangzhou.aliyuncs.com/img/20240527110732.png)
+<img src="https://chenxia31blog.oss-cn-hangzhou.aliyuncs.com/img/20240527110732.png" alt="沈老师派工逻辑梳理示意图" style="zoom: 25%;" />
 
 ### 仿真数据说明
 
@@ -20,9 +43,21 @@
 3. 观测航班信息.xlsx; 在上述信息上提取的规则数据
 4. 机型最小人员数;更新在最新的表格
 
+额外新增的数据
 
+- 【Zhoupeng 增加的数据】
+- './dataset/flights_obs_0917_0923.xlsx' 新观察到的航班数据
+- './dataset/Gate_lounge_xy.xlsx' 增加位置信息的机场近机位数据
+- ADS-B 数据文件夹
 
 ### 仿真流程说明
+
+【最新的和 zhoupeng 重建的算法带来放在 airports_sim_zp中】
+
+- airports_sim_zp
+- data 文件夹中新增 ADS_B 数据获取
+
+【最初始的仿真流程再 airports_sim 文件夹中】
 
 仿真过程的类整理在根目录 /airports_sim 文件夹中，其中文件作用包括
 
